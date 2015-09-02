@@ -913,30 +913,25 @@ function islandora_paged_content_pdfinfo_availability() {
  *   FALSE if it fails, the URI of the text file otherwise.
  */
 function islandora_paged_content_extract_text_from_pdf($uri, $offset, $layout = TRUE) {
-  $file_path = drupal_realpath($uri);
   // PDF doesn't exist or pdftotext isn't available, abort.
-  if (!file_exists($file_path) || !islandora_paged_content_pdftotext_availability()) {
+  if (!file_exists($uri) || !islandora_paged_content_pdftotext_availability()) {
     return FALSE;
   }
   $pdftotext = variable_get('islandora_paged_content_pdftotext', '/usr/bin/pdftotext');
   $base_command = '!pdftotext_path !layout -f !offset -l !offset !pdf_uri !output_file';
-  $output_file = file_create_filename('full.txt', 'temporary://');
+  $output_file = 'temporary://full.txt';
 
   // Need to link the file because of UTF-8 encoding.
-  $path = file_create_filename('pdftotextpdf.pdf', 'temporary://');
-  $copy = drupal_realpath($path);
-  link($file_path, $copy);
   $command = format_string($base_command, array(
     '!pdftotext_path' => $pdftotext,
     '!layout' => $layout ? '-layout' : '',
     '!offset' => $offset,
-    '!pdf_uri' => escapeshellarg($copy),
-    '!output_file' => drupal_realpath($output_file),
+    '!pdf_uri' => '-',
+    '!output_file' => '-',
   ));
-  $output = array();
-  $ret = 0;
-  exec(escapeshellcmd($command), $output, $ret);
-  file_unmanaged_delete($copy);
+
+  list($ret, $errors) = islandora_paged_content_proc_open_process($command, $uri, $output_file);
+
   // UNIX exit code is 0, so this succeeded.
   if (!$ret) {
     return $output_file;
@@ -954,21 +949,16 @@ function islandora_paged_content_extract_text_from_pdf($uri, $offset, $layout = 
  *   FALSE if it fails, the number of pages in the PDF.
  */
 function islandora_paged_content_length_of_pdf($uri) {
-  $file_path = drupal_realpath($uri);
   // PDF doesn't exist or pdfinfo isn't available, abort.
-  if (!file_exists($file_path) || !islandora_paged_content_pdfinfo_availability()) {
+  if (!file_exists($uri) || !islandora_paged_content_pdfinfo_availability()) {
     return FALSE;
   }
   $pdfinfo = variable_get('islandora_paged_content_pdfinfo', '/usr/bin/pdfinfo');
-  // Need to link the file because of UTF-8 encoding.
-  $path = file_create_filename('pdfinfopdf.pdf', 'temporary://');
-  $copy = drupal_realpath($path);
-  link($file_path, $copy);
-  $command = escapeshellarg($pdfinfo) . ' ' . escapeshellarg($copy);
+
+  $command = escapeshellarg($pdfinfo) . ' -';
   $output = array();
-  $ret = 0;
-  exec(escapeshellcmd($command), $output, $ret);
-  file_unmanaged_delete($copy);
+  list($ret, $errors) = islandora_paged_content_proc_open_process($command, $uri, $output);
+
   // UNIX exit code is 0, so this succeeded.
   if (!$ret) {
     foreach ($output as $line) {
@@ -997,30 +987,25 @@ function islandora_paged_content_length_of_pdf($uri) {
  *   FALSE if it fails, the URI of the TIFF otherwise.
  */
 function islandora_paged_content_extract_tiff_from_pdf($uri, $offset, $device, $resolution) {
-  $file_path = drupal_realpath($uri);
   // PDF doesn't exist or gs isn't available, abort.
-  if (!file_exists($file_path) || !islandora_paged_content_can_combine_pdf()) {
+  if (!file_exists($uri) || !islandora_paged_content_can_combine_pdf()) {
     return FALSE;
   }
   $gs = variable_get('islandora_paged_content_gs', '/usr/bin/gs');
-  $output_file = file_create_filename("page{$offset}.tif", 'temporary://');
-  // Need to link the file because of UTF-8 encoding.
-  $path = file_create_filename('pdfforgs.pdf', 'temporary://');
-  $copy = drupal_realpath($path);
-  link($file_path, $copy);
+  $output_file = "temporary://page{$offset}.tif";
+
   $base_command = '!gs_path -q -dNOPAUSE -sDEVICE=!device -sCompression=lzw -sOutputFile=!output_file -r!resolution, -dFirstPage=!offset -dLastPage=!offset !pdf_uri';
   $command = format_string($base_command, array(
     '!gs_path' => escapeshellarg($gs),
     '!device' => $device,
     '!offset' => $offset,
-    '!output_file' => drupal_realpath($output_file),
+    '!output_file' => '-',
     '!resolution' => $resolution,
-    '!pdf_uri' => escapeshellarg($copy),
+    '!pdf_uri' => '-',
   ));
-  $output = array();
-  $ret = 0;
-  exec(escapeshellcmd($command), $output, $ret);
-  file_unmanaged_delete($copy);
+
+  list($ret, $errors) = islandora_paged_content_proc_open_process($command, $uri, $output_file);
+
   if (!$ret) {
     return $output_file;
   }
@@ -1040,28 +1025,22 @@ function islandora_paged_content_extract_tiff_from_pdf($uri, $offset, $device, $
  *   FALSE if it fails, the URI of the PDF otherwise.
  */
 function islandora_paged_content_chop_pdf($uri, $offset) {
-  $file_path = drupal_realpath($uri);
   // PDF doesn't exist or gs isn't available, abort.
-  if (!file_exists($file_path) || !islandora_paged_content_can_combine_pdf()) {
+  if (!file_exists($uri) || !islandora_paged_content_can_combine_pdf()) {
     return FALSE;
   }
   $gs = variable_get('islandora_paged_content_gs', '/usr/bin/gs');
-  $output_file = file_create_filename("page{$offset}.pdf", 'temporary://');
-  // Need to link the file because of UTF-8 encoding.
-  $path = file_create_filename('pdfforgssplit.pdf', 'temporary://');
-  $copy = drupal_realpath($path);
-  link($file_path, $copy);
+  $output_file = "temporary://page{$offset}.pdf";
+
   $base_command = '!gs_path -q -dNOPAUSE -dBATCH -dSAFER -sDEVICE=pdfwrite -sOutputFile=!output_file -dFirstPage=!offset -dLastPage=!offset !pdf_uri';
   $command = format_string($base_command, array(
     '!gs_path' => escapeshellarg($gs),
     '!offset' => $offset,
-    '!output_file' => drupal_realpath($output_file),
-    '!pdf_uri' => escapeshellarg($copy),
+    '!output_file' => '-',
+    '!pdf_uri' => '-',
   ));
   $output = array();
-  $ret = 0;
-  exec(escapeshellcmd($command), $output, $ret);
-  file_unmanaged_delete($copy);
+  list($ret, $errors) = islandora_paged_content_proc_open_process($command, $uri, $output_file);
   if (!$ret) {
     return $output_file;
   }
@@ -1143,4 +1122,63 @@ function islandora_paged_content_add_relationships_to_child(AbstractObject $obje
  */
 function islandora_paged_content_retrieve_applicable_cmodels() {
   return module_invoke_all('islandora_paged_content_content_model_registry');
+}
+
+/**
+ * Helper to run an subprocess.
+ *
+ * @param string $command
+ *   The command to run.
+ * @param string $input_file_uri
+ *   A URI to open and pass to the command via stdin.
+ * @param string|array $output_file_uri
+ *   Somewhat misnamed: Either a reference to a string to which to save the output
+ *   (may be changed for uniqueness) or an array we'll replace with the lines output
+ *   from the command.
+ *
+ * @return array
+ *   An array containing:
+ *   - An integer representing the exitcode of the command, and
+ *   - A string representing the stderr output when running the command.
+ */
+function islandora_paged_content_proc_open_process($command, $input_file_uri, &$output_file_uri) {
+  dsm(t('Running "@command" taking "@input_file_uri" and outputting "@output_file_uri".', array(
+    '@command' => $command,
+    '@input_file_uri' => $input_file_uri,
+    '@output_file_uri' => is_array($output_file_uri) ? 'an array' : $output_file_uri,
+  )));
+  $input = fopen($input_file_uri, 'rb');
+  $output = tmpfile();
+  $desc_spec = array(
+    0 => $input,
+    1 => $output,
+    2 => array('pipe', 'w'),
+  );
+  $pipes = array();
+  $proc = proc_open($command, $desc_spec, $pipes);
+
+  while ($status = proc_get_status($proc) && !$status['running']) {
+    dsm('spinning...');
+    usleep(250000);
+  }
+
+  $errors = stream_get_contents($pipes[2]);
+  fclose($pipes[2]);
+
+  proc_close($proc);
+
+  fseek($output, 0);
+  if (is_array($output_file_uri)) {
+    $output_file_uri = explode("\n", stream_get_contents($output));
+  }
+  else {
+    $output_file_uri = file_unmanaged_save_data($output, $output_file_uri, FILE_EXISTS_RENAME);
+  }
+
+  fclose($input);
+  fclose($output);
+
+  dsm('command done');
+
+  return array($status['exitcode'], $errors);
 }
