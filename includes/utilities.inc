@@ -1145,12 +1145,11 @@ function islandora_paged_content_retrieve_applicable_cmodels() {
  *   - A string representing the stderr output when running the command.
  */
 function islandora_paged_content_proc_open_process($command, $input_file_uri, &$output_file_uri) {
-  dsm(t('Running "@command" taking "@input_file_uri" and outputting "@output_file_uri".', array(
-    '@command' => $command,
-    '@input_file_uri' => $input_file_uri,
-    '@output_file_uri' => is_array($output_file_uri) ? 'an array' : $output_file_uri,
-  )));
-  $input = fopen($input_file_uri, 'rb');
+  // XXX: proc_open() must be passed a "real file descriptor", so we must
+  // "realpath()"; things passing through user-space (like stream wrappers)
+  // doesn't work.
+  $input = fopen(drupal_realpath($input_file_uri), 'rb');
+
   $output = tmpfile();
   $desc_spec = array(
     0 => $input,
@@ -1160,15 +1159,11 @@ function islandora_paged_content_proc_open_process($command, $input_file_uri, &$
   $pipes = array();
   $proc = proc_open($command, $desc_spec, $pipes);
 
-  while ($status = proc_get_status($proc) && !$status['running']) {
-    dsm('spinning...');
-    usleep(250000);
-  }
-
   $errors = stream_get_contents($pipes[2]);
   fclose($pipes[2]);
 
-  proc_close($proc);
+  $exitcode = proc_close($proc);
+  fclose($input);
 
   fseek($output, 0);
   if (is_array($output_file_uri)) {
@@ -1178,10 +1173,10 @@ function islandora_paged_content_proc_open_process($command, $input_file_uri, &$
     $output_file_uri = file_unmanaged_save_data($output, $output_file_uri, FILE_EXISTS_RENAME);
   }
 
-  fclose($input);
   fclose($output);
 
-  dsm('command done');
-
-  return array($status['exitcode'], $errors);
+  return array(
+    $exitcode,
+    $errors,
+  );
 }
