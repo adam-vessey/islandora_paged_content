@@ -675,10 +675,8 @@ function islandora_paged_content_get_technical_metadata(AbstractObject $object) 
     return FALSE;
   }
   $metadata = FALSE;
-  $file = file_create_filename("{$object->id}_{$dsid}.xml", 'temporary://');
-  $file = drupal_realpath($file);
-  if (strpos($object[$dsid]->mimetype, 'xml') !== FALSE && $object[$dsid]->getContent($file)) {
-    $doc = simplexml_load_file($file);
+  if (strpos($object[$dsid]->mimetype, 'xml') !== FALSE) {
+    $doc = simplexml_load_file($object[$dsid]->content);
     $doc->registerXPathNamespace('ns', 'http://hul.harvard.edu/ois/xml/ns/fits/fits_output');
     $width_xpath = $doc->xpath('/ns:fits/ns:metadata/ns:image/ns:imageWidth');
     $width = (int) array_pop($width_xpath);
@@ -686,7 +684,6 @@ function islandora_paged_content_get_technical_metadata(AbstractObject $object) 
     $height = (int) array_pop($height_xpath);
     $metadata = array('width' => $width, 'height' => $height);
   }
-  file_unmanaged_delete($file);
   return $metadata;
 }
 
