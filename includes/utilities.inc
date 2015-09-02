@@ -919,7 +919,8 @@ function islandora_paged_content_extract_text_from_pdf($uri, $offset, $layout = 
   }
   $pdftotext = variable_get('islandora_paged_content_pdftotext', '/usr/bin/pdftotext');
   $base_command = '!pdftotext_path !layout -f !offset -l !offset !pdf_uri !output_file';
-  $output_file = 'temporary://full.txt';
+  $uri_md5 = md5($uri);
+  $output_file = "temporary://{$uri_md5}--full.txt";
 
   // Need to link the file because of UTF-8 encoding.
   $command = format_string($base_command, array(
@@ -992,7 +993,8 @@ function islandora_paged_content_extract_tiff_from_pdf($uri, $offset, $device, $
     return FALSE;
   }
   $gs = variable_get('islandora_paged_content_gs', '/usr/bin/gs');
-  $output_file = "temporary://page{$offset}.tif";
+  $uri_md5 = md5($uri);
+  $output_file = "temporary://{$uri_md5}--page{$offset}.tif";
 
   $base_command = '!gs_path -q -dNOPAUSE -sDEVICE=!device -sCompression=lzw -sOutputFile=!output_file -r!resolution, -dFirstPage=!offset -dLastPage=!offset !pdf_uri';
   $command = format_string($base_command, array(
@@ -1030,7 +1032,8 @@ function islandora_paged_content_chop_pdf($uri, $offset) {
     return FALSE;
   }
   $gs = variable_get('islandora_paged_content_gs', '/usr/bin/gs');
-  $output_file = "temporary://page{$offset}.pdf";
+  $uri_md5 = md5($uri);
+  $output_file = "temporary://{$uri_md5}--page{$offset}.pdf";
 
   $base_command = '!gs_path -q -dNOPAUSE -dBATCH -dSAFER -sDEVICE=pdfwrite -sOutputFile=!output_file -dFirstPage=!offset -dLastPage=!offset !pdf_uri';
   $command = format_string($base_command, array(
