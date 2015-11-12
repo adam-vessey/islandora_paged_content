@@ -620,6 +620,10 @@ function islandora_paged_content_consolidate_missing_ocr_batch_operation(&$conte
     $sandbox['objects_completed'] = 0;
     $sandbox['objects'] = islandora_paged_content_get_missing_ocr_paged_content_objects();
     $sandbox['total'] = count($sandbox['objects']);
+    if ($sandbox['total'] === 0) {
+      $context['message'] = t('No objects to process.');
+      return;
+    }
   }
 
   if (!empty($sandbox['objects'])) {
